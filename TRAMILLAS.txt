@@ -1,0 +1,173 @@
+
+################################### DOCU DEL CURSO ##################################
+
+CREAR UN COMPONENTE VIENDO DONDE SE VA A CREAR PERO SIN REALIZAR CAMBIOS:
+    ng g c pages/about --dry-run
+
+
+Saca esto por consola:
+    CREATE src/app/pages/about/about.component.html (20 bytes)
+    CREATE src/app/pages/about/about.component.spec.ts (621 bytes)
+    CREATE src/app/pages/about/about.component.ts (266 bytes)
+    CREATE src/app/pages/about/about.component.scss (0 bytes)
+    UPDATE src/app/app.module.ts (398 bytes)
+
+Hemos creado componentes dentro de pages, aunque son paginas.
+Vamos a emplear selector dentro de about.component, que es lo qeu nos permite referenciar dicho componente
+En app.module.ts debemos tener declarados los componentes a usar, sino pega fallazo y dice que necesitamos importar algun modulo.
+
+Repaso 1: Generar un componente dentro de la carpeta pages y en el app.component.html debe aparecer ese componente justo encima de los otros
+dos creados anteriormente.
+
+
+Vamos a crear un módulo que nos permita manejar las rutas de apps:
+    ng g m appRouting --flat
+Con --flat nos permite crear dicho modulo dentro de la carpeta en cuestion y no nos genera (el directorio) una carpeta y dentro el módulo.
+Una vez hemos creado una const con las rutas y sus componentes, debemos añadir dentro de los imports la linea de abajo y crear un exports:
+
+    @NgModule({
+    declarations: [],
+    imports: [
+        RouterModule.forRoot( routes ) //importamos con la clase RouterModule y en concreto el método forRoot llamamos a la const routes donde tenemos nuestras rutas/ este forRoot sólo se emplea una vez
+    ],
+    exports: [
+        RouterModule // una vez hecho esto, debemos exporta este módulo para que Angular pueda interpretarlo y debemos añadir este archivo(app-routing.module) en los imports de app.module.ts
+    ]
+    })
+
+Hecho esto, al modificar las rutas funciona correctamente, la cosa es que dentro del app.component.html unicamente estamos llamando a los componentes de cada pagina sin más,
+debemos añadir un elemento llamado <router-outlet>, con el cual utilizamos la url para irnos moviendo entre paginas, el problema es que es algo más tedioso y cada vez que modificamos 
+la ruta hace un refresh, lo que queremos hacer a continuación es ir navegando entre las páginas con RouterLink y MenuComponent.
+
+Con RouterLink podemos movernos entre paginas de dos formas formas:
+Haciendo referencia a la ruta en cuestión, lo cual es menos limpio:
+    <a routerLink ="/contact" class="list-group-item">
+        CONTACT
+    </a>
+
+Ó<!--Para hacerlo un tanto más dinámico, haremos lo siguiente:-->
+
+    <a [routerLink] ="ruta.path" class="list-group-item" *ngFor="let ruta of rutas">
+    {{ ruta.name }}
+    </a>
+Esto hace referencia a un array que hemos creado en nuestro menu.component.ts en el cual le pasamos un path y un name.
+Dicho array lo recorremos con ngFor y listo.
+
+A continuación y puesto que el objetivo es tener el archivo app.module.ts lo más limpio posible, podemos agrupar todos los componentes (que serían en este caso las páginas de nuestra app) 
+en un módulo denominado pages.module. 
+En principio queda algo mejor, el problema está al momento de pasar a producción la app y es que tendría compactado en un archivo todas las apps con sus imports y eso al final ralentizaría
+todo el proceso.
+Para ello vamos a emplear una forma de cargar módulos denominada Lazyload (o carga perezosa).
+Nos generamos una carpeta con un archivo llamado posts.module, otro posts.component y uno más posts-routing.module.
+ posts.module-----------> Tenemos la declaracion del modulo posts-routing.modules (en el cual tendremos las rutas)
+ posts.component -------> Tenemos el componente.
+ posts-routing.module---> Archivo igual que el de app-routing.module, pero generado mediante la cli de angular.(en este archivo, dentro del array de rutas pondremos la ruta y el compo
+ nente a mostrar)
+El componente de posts.component, queremos cargarlo de manera LAZYLOAD. Para poder hacerlo, debemos hacer alusiÓn desde el mÓdulo de rutas principales "padre"/"general" (app-routing.module),
+dentro del array Routes.
+(Realmente este posts.component es una página más a la cuál hacemos referencia)
+##### OJO CUIDAO #####
+    //creamos una constante en la que almacenaremos nuestras rutas y los componentes a los que hace referencia
+    const routes : Routes = [
+
+        {
+        path: 'home',
+        component: HomeComponent
+        },
+        {
+        path: 'about',
+        component: AboutComponent
+        },
+        {
+        path: 'contact',
+        component: ContactComponent
+        },
+        ############################################################################
+        ############################################################################
+                //ALUSIÓN AL COMPONENTE posts-routing.module
+                {
+                path: 'posts',
+                loadChildren: './pages/posts/posts.module#PostsModule'
+                },
+                //ruta que nos permite redirigir en caso de que se introduzca una ruta erronea
+                {
+                path: '**',
+                redirectTo: 'home'
+                },
+        #############################################################################
+        #############################################################################
+    
+    ];
+
+    El orden en que se colocan los componentes o se cargan, hay que tenerlo en cuenta, ya que si se pone encima el redirectTo (por ejemplo), el resto de 
+    componentes o de cargas no se realiza correctamente ya que estos, se recorren con un ngFor dentro del menu.component:
+        <a [routerLink] ="ruta.path" class="list-group-item" *ngFor="let ruta of rutas">
+            {{ ruta.name }}
+        </a>
+
+Servicios y peticiones http.
+Para poder gestionar información/datos podemos emplear servicios para ello:
+Básicamente un servicio nos permite el paso de información entre componentes/modulos, etc ( actualmente el alcance de estos servicios, es decir, hasta que componentes/modulos pueden
+acceder es root)
+Añadido a esto vamos a realizar una peticion http empleando un módulo de angular que nos facilita dicha conexión:
+    import { HttpClientModule } from '@angular/common/http'; (en app.module)
+    y en los imports de ese mismo archivo debemos reflejar dicho módulo (HttpClientModule)
+
+Una vez tenemos realizada la peticion http y tenemos los datos por consola en un servicio, vamos a mostrarlos en un componente.
+Para ello vamos a crearnos un array vacio en el archivo posts.component:
+
+    //OPCION 1-BASURRILLA
+        //mensajes: any[] = [];//array donde meteremos los posts de la peticion http
+
+    //OPCIÓN 2- GODMODE
+        mensajes:any;
+
+    ngOnInit() {
+
+    //OPCION 1-BASURILLA
+        //llamamos al servicio y n0s suscribimos a él (lo único a tener en cuenta es que hay que cancelar dicha subscripcion para que no se genere basurilla)
+        /* this.dataService.getPosts()
+        .subscribe((posts: any[]) =>{
+            console.log(posts);
+            this.mensajes = posts;
+        });*/
+
+
+    //OPCIÓN 2- GODMODE
+        //la forma correcta de hacer dicha subscirpcion y ahorra memoria seria la de emplear un pipe de angular llamado async
+        this.mensajes = this.dataService.getPosts();//de esta forma estamos generando un puntero al metodo getPosts() que guardamos en mensajes.
+
+    }
+
+Debido a que queremos ver en consola (aunque esto es opcional) los datos que trae con la petición http empleamos la funcion tap.
+Dicha función se implementa en el archivo data.servcie:
+
+    getPosts(){
+        //return this.http.get('https://jsonplaceholder.typicode.com/posts');
+        
+        //con este pipe conseguimos que con la función tap recoga los datos de posts
+        return this.http.get('https://jsonplaceholder.typicode.com/posts')
+        //opción 1 
+        /*.pipe(
+        tap(posts =
+
+        );*/
+        //opción 2
+            .pipe(tap(console.log));//que quedaría mucho más limpio
+
+    }
+
+    https://rxjs-dev.firebaseapp.com/api/operators/tap
+
+
+    ############################################################        CLAVES DE IONIC      ###########################################################################
+
+    Al crear un proyecto con Angular, realmente no hay diferencias entre crear un componente y una página, es decir, en lo referente a comportamiento es algo muy similiar.
+    La cosa está en que la diferencia que hay entre pagina y componente es que la primera tiene un archivo de rutas(routing.module) y los componentes no.
+
+    A la hora de la navegación entre pantallas, tenemos lo siguiente:
+
+        <ion-buttons slot="start">
+          <ion-back-button defaultHref ="/"></ion-back-button>
+        </ion-buttons>
+    Al poner ----- slot="start", indicamos que se muestre/posicone a la izquierda del contenido Positions to the left of the content in LTR, and to the right in RTL.
